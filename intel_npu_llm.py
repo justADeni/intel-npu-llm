@@ -20,7 +20,7 @@ def streamer(subword):
     print(subword, end='', flush=True)
     return False
 
-def select_from_list(options = [], allow_none = False):
+def select_from_list(options = [], question, allow_none = False):
     if not options:
         raise ValueError(Fore.RED + "The list is empty.")
 
@@ -148,7 +148,7 @@ def download_and_or_select_model():
     return selected
 
 def load(model_name, model_path, prompt_length):
-    is_cached = os.path.isdir(os.path.join(script_dir, "npucache", model_name))
+    is_cached = os.path.isdir(os.path.join(script_dir, "npu_cache", model_name))
     if is_cached:
         loading_text = "Loading the NPU compiled model from cache."
         loaded_text = "Model loaded in "
@@ -160,7 +160,7 @@ def load(model_name, model_path, prompt_length):
     warnings.filterwarnings("ignore", category=DeprecationWarning) 
     print(Fore.GREEN + loading_text + Fore.RESET, flush=True)
     model_load_start = time.time()
-    pipeline_config = { "NPUW_CACHE_DIR": os.path.join(script_dir, "npucache", model_name), "GENERATE_HINT": "BEST_PERF", "MAX_PROMPT_LEN": prompt_length }
+    pipeline_config = { "NPUW_CACHE_DIR": os.path.join(script_dir, "npu_cache", model_name), "GENERATE_HINT": "BEST_PERF", "MAX_PROMPT_LEN": prompt_length }
     pipe = openvino_genai.LLMPipeline(model_path, 'NPU', pipeline_config)
     model_load_stop = time.time()
     print(Fore.GREEN + loaded_text + str(round(model_load_stop - model_load_start,1)) + " seconds. \n" + Fore.RESET, flush=True)
