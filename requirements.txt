@@ -1,0 +1,9 @@
+nncf==2.12
+onnx==1.16.1
+optimum-intel==1.19.0
+openvino==2024.6
+openvino-tokenizers==2024.6
+openvino-genai==2024.6
+colorama==0.4.6
+huggingface_hub==0.27.1
+optimum==1.23.3
