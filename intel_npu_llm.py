@@ -8,6 +8,7 @@ from colorama import Fore
 import openvino
 import openvino_genai
 from huggingface_hub import model_info
+from huggingface_hub.utils import HfHubHTTPError, HFValidationError
 
 # Helper functions
 
@@ -20,7 +21,7 @@ def streamer(subword):
     print(subword, end='', flush=True)
     return False
 
-def select_from_list(options = [], question, allow_none = False):
+def select_from_list(options = [], question=Fore.GREEN + "Select a number: " + Fore.RESET, allow_custom=False):
     if not options:
         raise ValueError(Fore.RED + "The list is empty.")
 
@@ -29,19 +30,37 @@ def select_from_list(options = [], question, allow_none = False):
 
     while True:
         try:
-            choice = input(Fore.GREEN + "Enter the number of your choice: " + Fore.RESET)
+            choice = input(question)
             if choice == "exit":
                 exit()
-            if choice == "" and allow_none:
-                return None
-
+            
             choice = int(choice)
             if 1 <= choice <= len(options):
                 return strip_ansi_colors(options[choice - 1])
             else:
                 print(Fore.RED + "Invalid number. Please try again.", flush=True)
         except ValueError:
-            print(Fore.RED + "Please enter a valid number.", flush=True)
+            if allow_custom:
+                if check_model_exists(choice):
+                    return choice
+            else:    
+                print(Fore.RED + "Please enter a valid number.", flush=True)
+
+def check_model_exists(model_id):
+    try:
+        # Attempt to fetch model information
+        info = model_info(model_id)
+        return True
+    except (HfHubHTTPError, HFValidationError) as e:
+        if "404" in str(e):
+            print(Fore.RED + f"Model '{model_id}' not found. Are you connected to the internet?" + Fore.RESET, flush=True)
+            return False
+        elif "namespace/repo_name" in str(e):
+            print(Fore.RED + f"Repo id must be in the form 'repo_name' or 'namespace/repo_name'" + Fore.RESET, flush=True)
+            return False
+        else:
+            print(f"An error occurred: {e}")
+            raise
 
 # Directory containing the models (relative to script location)
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -73,8 +92,11 @@ def get_command_output(command):
     return result.stdout.strip()
 
 def local_models():
+    models = []
     try:
-        models = [d for d in os.listdir(models_dir) if os.path.isdir(os.path.join(models_dir, d))]
+        for vendor in os.listdir(models_dir):
+            for model in os.listdir(os.path.join(models_dir, vendor)):
+                models.append(f"{vendor}/{model}")
         if not models:
             return []
         return models
@@ -84,9 +106,6 @@ def local_models():
 ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 def strip_ansi_colors(string):
     return ansi_escape.sub('', string)
-
-def simple_name(fullname):
-    return fullname.split("/")[1]
 
 def streamer(subword):
     print(subword, end='', flush=True)
@@ -100,7 +119,7 @@ def get_valid_number(prompt, default_value, min_value, max_value):
                 return default_value
             if user_input == "exit":
                 exit()
-            user_input = int(input)
+            user_input = int(user_input)
             if min_value <= user_input <= max_value:
                 return user_input
             else:
@@ -130,21 +149,24 @@ def download_and_or_select_model():
     c = copy.deepcopy(model_selection)
     available_to_download = [item for item in c if not any(sub in item for sub in l)]
 
+    c += [s for s in l if not any(s in u for u in c)]
     c = [ Fore.CYAN + s + Fore.RESET if s not in available_to_download else Fore.RESET + s for s in c]
 
-    selected = select_from_list(c)
+    selected = select_from_list(c, Fore.GREEN + "Select a number or paste custom model name: " + Fore.RESET, allow_custom=True)
         
-    if selected in available_to_download:
+    if selected not in l:
         if check_gated(selected):
             register_token()
 
-        if "gptq" in selected.lower():
-            print(Fore.GREEN + "Downloading selected model." + Fore.RESET, flush=True)
-            print(os.system("optimum-cli export openvino -m " + selected + " models/" + simple_name(selected)))
-        else:    
-            print(Fore.GREEN + "Downloading and quantizing selected model to INT4." + Fore.RESET, flush=True)
-            print(os.system("optimum-cli export openvino -m " + selected + " --weight-format int4 --sym --ratio 1.0 --group-size 128 --trust-remote-code --task text-generation-with-past --cache_dir " + os.path.join(script_dir,"download_cache") + " models/" + simple_name(selected)))
-    
+        loaded = False
+        while not loaded:
+            try:
+                print(Fore.GREEN + "Downloading and quantizing selected model to INT4." + Fore.RESET, flush=True)
+                print(os.system("optimum-cli export openvino -m " + selected + " --weight-format int4 --sym --ratio 1.0 --group-size 128 --trust-remote-code --task text-generation-with-past --cache_dir " + os.path.join(script_dir,"download_cache") + " models/" + selected))
+                loaded = True    
+            except ValueError as e:
+                print(Fore.RED + f"Error while quantizing {selected}:" + Fore.RESET + f"{e}", flush=True)
+
     return selected
 
 def load(model_name, model_path, prompt_length):
@@ -161,7 +183,7 @@ def load(model_name, model_path, prompt_length):
     print(Fore.GREEN + loading_text + Fore.RESET, flush=True)
     model_load_start = time.time()
     pipeline_config = { "NPUW_CACHE_DIR": os.path.join(script_dir, "npu_cache", model_name), "GENERATE_HINT": "BEST_PERF", "MAX_PROMPT_LEN": prompt_length }
-    pipe = openvino_genai.LLMPipeline(model_path, 'NPU', pipeline_config)
+    pipe = openvino_genai.LLMPipeline(os.path.join(script_dir, model_path), 'NPU', pipeline_config)
     model_load_stop = time.time()
     print(Fore.GREEN + loaded_text + str(round(model_load_stop - model_load_start,1)) + " seconds. \n" + Fore.RESET, flush=True)
     return pipe
@@ -198,7 +220,7 @@ def generate(pipe, config):
 
 def main():
     check_for_NPU()
-    model_name = simple_name(download_and_or_select_model())
+    model_name = download_and_or_select_model()
     model_path = os.path.join("models", model_name)
     prompt_length = get_valid_number(Fore.GREEN + "\nPick context length between 256 and 16384. This number includes both your prompts and llm responses, until it overflows and chat resets. Larger numbers will take longer to compile, run and will consume more memory. (1024)" + Fore.RESET, 1024, 256, 16384)
     pipe = load(model_name, model_path, prompt_length)

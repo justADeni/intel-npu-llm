@@ -27,7 +27,7 @@ As you can see, It's using NPU for text generation.
 
 ## Requirements ✅
 
-- Python **3.9** to **3.11**
+- Python **3.9** to **3.12**
 - An Intel processor with an NPU:
   - Meteor Lake (Core Ultra Series 1, i.e., 1XX chips)
   - Lunar Lake (Core Ultra Series 2, i.e., 2XX chips)
