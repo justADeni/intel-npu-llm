@@ -182,9 +182,10 @@ def load(model_name, model_path, prompt_length, scheduler_config):
     warnings.filterwarnings("ignore", category=DeprecationWarning) 
     print(Fore.GREEN + loading_text + Fore.RESET, flush=True)
     model_load_start = time.time()
-    pipeline_config = { "NPUW_CACHE_DIR": os.path.join(script_dir, "npu_cache", model_name.split("/")[0], model_name.split("/")[1]), "GENERATE_HINT": "BEST_PERF", "MAX_PROMPT_LEN": prompt_length, "scheduler_config": scheduler_config }
-    pipe = openvino_genai.LLMPipeline(
+    pipeline_config = { "NPUW_CACHE_DIR": os.path.join(script_dir, "npu_cache", model_name.split("/")[0], model_name.split("/")[1]), "GENERATE_HINT": "BEST_PERF", "MAX_PROMPT_LEN": prompt_length}
+    pipe = openvino_genai.ContinuousBatchingPipeline(
         models_path=os.path.join(script_dir, model_path),
+        scheduler_config=scheduler_config,
         device='NPU',
         properties=pipeline_config)
     
