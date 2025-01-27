@@ -169,7 +169,7 @@ def download_and_or_select_model():
 
     return selected
 
-def load(model_name, model_path, prompt_length):
+def load(model_name, model_path, prompt_length, scheduler_config):
     is_cached = os.path.isdir(os.path.join(script_dir, "npu_cache", model_name))
     if is_cached:
         loading_text = "Loading the NPU compiled model from cache."
@@ -182,8 +182,12 @@ def load(model_name, model_path, prompt_length):
     warnings.filterwarnings("ignore", category=DeprecationWarning) 
     print(Fore.GREEN + loading_text + Fore.RESET, flush=True)
     model_load_start = time.time()
-    pipeline_config = { "NPUW_CACHE_DIR": os.path.join(script_dir, "npu_cache", model_name), "GENERATE_HINT": "BEST_PERF", "MAX_PROMPT_LEN": prompt_length }
-    pipe = openvino_genai.LLMPipeline(os.path.join(script_dir, model_path), 'NPU', pipeline_config)
+    pipeline_config = { "NPUW_CACHE_DIR": os.path.join(script_dir, "npu_cache", model_name.split("/")[0], model_name.split("/")[1]), "GENERATE_HINT": "BEST_PERF", "MAX_PROMPT_LEN": prompt_length, "scheduler_config": scheduler_config }
+    pipe = openvino_genai.LLMPipeline(
+        models_path=os.path.join(script_dir, model_path),
+        device='NPU',
+        properties=pipeline_config)
+    
     model_load_stop = time.time()
     print(Fore.GREEN + loaded_text + str(round(model_load_stop - model_load_start,1)) + " seconds. \n" + Fore.RESET, flush=True)
     return pipe
@@ -209,7 +213,7 @@ def generate(pipe, config):
                 gen_stop = time.time()
                 # I know this isn't a super accurate measure, but openvino.PerfMetrics refused to work
                 print("\n" + str(round((len(response)/(gen_stop - gen_start))/4,1)) + "t/s")
-                print('\n----------')
+                print('\n---------------')
             pipe.finish_chat()
         except RuntimeError as e:
             if str(e) == "manual":
@@ -222,16 +226,34 @@ def main():
     check_for_NPU()
     model_name = download_and_or_select_model()
     model_path = os.path.join("models", model_name)
-    prompt_length = get_valid_number(Fore.GREEN + "\nPick context length between 256 and 16384. This number includes both your prompts and llm responses, until it overflows and chat resets. Larger numbers will take longer to compile, run and will consume more memory. (1024)" + Fore.RESET, 1024, 256, 16384)
-    pipe = load(model_name, model_path, prompt_length)
+    pl = get_valid_number(Fore.GREEN + "\nPick context length between 256 and 16384. This number includes both your prompts and llm responses, until it overflows and chat resets. Larger numbers will take longer to compile, run and will consume more memory. (1024)" + Fore.RESET, 1024, 256, 16384)
+
+    cache_config = openvino_genai.CacheEvictionConfig(
+        start_size = int(pl/8),
+        recent_size = int(pl/4),
+        max_cache_size = int(pl),
+        aggregation_mode=openvino_genai.AggregationMode.SUM
+    )
+
+    scheduler_config = openvino_genai.SchedulerConfig()
+    scheduler_config.cache_eviction_config = cache_config
+    scheduler_config.use_cache_eviction = True
+    scheduler_config.dynamic_split_fuse = True
+    scheduler_config.enable_prefix_caching = True
+    scheduler_config.cache_size = int(pl/256)
+    scheduler_config.max_num_batched_tokens = int(pl*2)
+    scheduler_config.max_num_seqs = int(pl/32)
+    scheduler_config.num_kv_blocks = int(pl/4)
 
     config = openvino_genai.GenerationConfig()
     config.do_sample = False
     config.top_k = 50
     config.top_p = 0.9
-    config.repetition_penalty = 1.3
-    config.no_repeat_ngram_size = 2
-    config.temperature = 0.7
+    config.repetition_penalty = 1.2
+    config.no_repeat_ngram_size = 3
+    config.temperature = 0.75
+
+    pipe = load(model_name, model_path, pl, scheduler_config)
 
     print(Fore.GREEN + "Chat commands: \nexit - unload the model and exit the script \nreset - resets the chat context manually\n" + Fore.RESET, flush=True)
     generate(pipe, config)

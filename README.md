@@ -1,16 +1,15 @@
-# Intel-NPU-LLM
-
-A simple Python script for running LLMs on Intel’s Neural Processing Units (NPUs). 🔧🌌
-
 ## Features 🌟
 
-- **Currently Supported Models**:
+- **Default models list**:
   - meta-llama/Meta-Llama-3.1-8B-Instruct
   - microsoft/Phi-3-mini-4k-instruct
   - Qwen/Qwen2-7B
   - mistralai/Mistral-7B-Instruct-v0.2
   - openbmb/MiniCPM-1B-sft-bf16
   - TinyLlama/TinyLlama-1.1B-Chat-v1.0
+- **User can input any model they like**
+  - No guarantee any model will compile for the NPU, though
+  - [here is a list of models likely to run on NPU](https://docs.openvino.ai/2024/about-openvino/performance-benchmarks/generative-ai-performance.html)
 - **One-Time Setup**: The script downloads the model, quantizes it, converts it to OpenVINO IR format, compiles it for the NPU, and caches the result for future use. 💡⌛
 - **Performance**: Surprisingly fast inference speeds, even on devices with modest computational power (e.g., my Meteor Lake's 13 TOPS NPU). ⚡⏳
 - **Power Efficiency**: While inference might be faster on a CPU or GPU for some devices, the NPU is significantly more energy-efficient, making it ideal for laptops. 🔋🌐
@@ -77,7 +76,7 @@ python intel_npu_llm.py
 ## Notes ℹ️
 
 - **Resource-Intensive Compilation**: The quantization and compilation steps can be time-consuming, taking up to tens of minutes depending on your hardware. However, these steps are performed only once per model and are cached for future use. ⌛⚙️
-- **Performance**: Despite the resource-intensive setup, inference is optimized for NPUs and provides excellent performance, even on modest hardware. ✨⏳
+- **Performance**: Despite the resource-intensive setup, inference is optimized for NPUs and provides acceptable performance, even on modest hardware. ✨⏳
 
 ## Contributing ⭐
 
@@ -89,4 +88,4 @@ This project is licensed under the [MIT License](LICENSE). 🔒✨
 
 ---
 
-Enjoy using `intel-npu-llm`! For any questions or feedback, please reach out or open an issue on GitHub. ✨🔧
+Enjoy using `intel-npu-llm` ! For any questions or feedback, please reach out or open an issue on GitHub. ✨🔧
