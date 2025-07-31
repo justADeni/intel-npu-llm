@@ -9,7 +9,7 @@
   - TinyLlama/TinyLlama-1.1B-Chat-v1.0
 - **User can input any model they like**
   - No guarantee that every model will compile for the NPU, though
-  - [here is a list of models likely to run on NPU](https://docs.openvino.ai/2024/about-openvino/performance-benchmarks/generative-ai-performance.html)
+  - [here is a list of models likely to run on NPU](https://docs.openvino.ai/2025/about-openvino/performance-benchmarks/generative-ai-performance.html)
 - **One-Time Setup**: The script downloads the model, quantizes it, converts it to OpenVINO IR format, compiles it for the NPU, and caches the result for future use. 💡⌛
 - **Performance**: Surprisingly fast inference speeds, even on devices with modest computational power (e.g., my Meteor Lake's 13 TOPS NPU). ⚡⏳
 - **Power Efficiency**: While inference might be faster on a CPU or GPU for some devices, the NPU is significantly more energy-efficient, making it ideal for laptops. 🔋🌐
@@ -26,7 +26,7 @@ As you can see, It's using NPU for text generation.
 
 ## Requirements ✅
 
-- Python **3.9** to **3.12**
+- Python **>= 3.13**
 - An Intel processor with an NPU:
   - Meteor Lake (Core Ultra Series 1, i.e., 1XX chips)
   - Arrow Lake (Core Ultra Series 2, i.e., 2XX chips)
@@ -75,8 +75,7 @@ python intel_npu_llm.py
 
 ## Notes ℹ️
 
-- **Resource-Intensive Compilation**: The quantization and compilation steps can be time-consuming, taking up to tens of minutes depending on your hardware. However, these steps are performed only once per model and are cached for future use. ⌛⚙️
-- **But wait, why does context fill up and then reset?**: [Continuous batching](https://docs.openvino.ai/2024/api/genai_api/_autosummary/openvino_genai.ContinuousBatchingPipeline.html) has not yet been implemented for NPU's by Intel's OpenVINO engineers. You can check API [coverage % here](https://docs.openvino.ai/2024/about-openvino/compatibility-and-support/supported-devices.html). 🚧🛠️
+- **Resource-Intensive Compilation**: The data-aware quantization and compilation steps can be time-consuming, taking up to tens of minutes depending on your hardware. However, these steps are performed only once per model and are cached for future use. ⌛⚙️
 
 ## Contributing ⭐
 

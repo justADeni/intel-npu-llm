@@ -162,7 +162,7 @@ def download_and_or_select_model():
         while not loaded:
             try:
                 print(Fore.GREEN + "Downloading and quantizing selected model to INT4." + Fore.RESET, flush=True)
-                print(os.system("optimum-cli export openvino -m " + selected + " --weight-format int4 --sym --ratio 1.0 --group-size -1 --trust-remote-code --scale-estimation --awq --dataset auto --task text-generation-with-past models/" + selected))
+                print(os.system("optimum-cli export openvino -m " + selected + " --weight-format int4 --sym --ratio 1.0 --group-size -1 --trust-remote-code models/" + selected))
                 loaded = True
             except ValueError as e:
                 print(Fore.RED + f"Error while quantizing {selected}:" + Fore.RESET + f"{e}", flush=True)
@@ -180,6 +180,7 @@ def load(model_name, model_path, prompt_length):
         pipeline_config = {
             "BLOB_PATH": blob_path,
             "GENERATE_HINT": "BEST_PERF",
+            "WEIGHTS_PATH": os.path.join(script_dir, "models", model_name, "openvino_model.bin"),
             "MAX_PROMPT_LEN": prompt_length
         }
     else:
@@ -191,7 +192,6 @@ def load(model_name, model_path, prompt_length):
             "EXPORT_BLOB": "YES",
             "BLOB_PATH": blob_path,
             "GENERATE_HINT": "BEST_PERF",
-            "CACHE_MODE" : "OPTIMIZE_SPEED",
             "MAX_PROMPT_LEN": prompt_length
         }
 
@@ -216,13 +216,12 @@ def generate(pipe, config):
                 if prompt == "exit":
                     exit()
                 if prompt == "reset":
-                    # Reminds me of "I raised that boy" meme
                     raise RuntimeError("manual")
 
                 gen_start = time.time()
                 response = pipe.generate(prompt, config, streamer)
                 gen_stop = time.time()
-                # I know this isn't a super accurate measure, but openvino.PerfMetrics refused to work
+                # Good enough for our purposes
                 print("\n" + str(round((len(response)/(gen_stop - gen_start))/4,1)) + "t/s")
                 print('\n----------')
             pipe.finish_chat()

@@ -6,4 +6,5 @@ openvino-tokenizers==2025.2.0.1
 openvino-genai==2025.2.0
 colorama==0.4.6
 huggingface_hub==0.33.5
+hf-xet==1.1.5
 optimum==1.26.1
