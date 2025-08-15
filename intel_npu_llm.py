@@ -162,30 +162,42 @@ def download_and_or_select_model():
         while not loaded:
             try:
                 print(Fore.GREEN + "Downloading and quantizing selected model to INT4." + Fore.RESET, flush=True)
-                print(os.system("optimum-cli export openvino -m " + selected + " --weight-format int4 --sym --ratio 1.0 --group-size 128 --trust-remote-code --task text-generation-with-past --cache_dir " + os.path.join(script_dir,"download_cache") + " models/" + selected))
-                loaded = True    
+                print(os.system("optimum-cli export openvino -m " + selected + " --weight-format int4 --sym --ratio 1.0 --group-size -1 --trust-remote-code models/" + selected))
+                loaded = True
             except ValueError as e:
                 print(Fore.RED + f"Error while quantizing {selected}:" + Fore.RESET + f"{e}", flush=True)
 
     return selected
 
 def load(model_name, model_path, prompt_length):
-    is_cached = os.path.isdir(os.path.join(script_dir, "npu_cache", model_name))
+    blob_path = os.path.join(script_dir, "npu_cache", model_name.split("/")[0], model_name.split("/")[1], "compiled_model.blob")
+    is_cached = os.path.isfile(blob_path)
+    pipeline_config = {}
+
     if is_cached:
         loading_text = "Loading the NPU compiled model from cache."
         loaded_text = "Model loaded in "
-    if not is_cached:
+        pipeline_config = {
+            "BLOB_PATH": blob_path,
+            "GENERATE_HINT": "BEST_PERF",
+            "WEIGHTS_PATH": os.path.join(script_dir, "models", model_name, "openvino_model.bin"),
+            "MAX_PROMPT_LEN": prompt_length
+        }
+    else:
+        os.makedirs(os.path.dirname(blob_path))
         print(Fore.MAGENTA + "Since you're running it for the first time, the model will be compiled and cached, which may take a while (up to tens of minutes), especially for larger models. Subsequent starts will be much faster (tens of seconds), though still resource intensive.", flush=True)
         loading_text = "Compiling and caching the model for NPU."
         loaded_text = "Model compiled in "
+        pipeline_config = { 
+            "EXPORT_BLOB": "YES",
+            "BLOB_PATH": blob_path,
+            "GENERATE_HINT": "BEST_PERF",
+            "MAX_PROMPT_LEN": prompt_length
+        }
 
     warnings.filterwarnings("ignore", category=DeprecationWarning) 
     print(Fore.GREEN + loading_text + Fore.RESET, flush=True)
     model_load_start = time.time()
-    pipeline_config = { 
-        "NPUW_CACHE_DIR": os.path.join(script_dir, "npu_cache", model_name.split("/")[0], model_name.split("/")[1]),
-        "GENERATE_HINT": "BEST_PERF",
-        "MAX_PROMPT_LEN": prompt_length }
     pipe = openvino_genai.LLMPipeline(os.path.join(script_dir, model_path), 'NPU', pipeline_config)
     model_load_stop = time.time()
     print(Fore.GREEN + loaded_text + str(round(model_load_stop - model_load_start,1)) + " seconds. \n" + Fore.RESET, flush=True)
@@ -204,13 +216,12 @@ def generate(pipe, config):
                 if prompt == "exit":
                     exit()
                 if prompt == "reset":
-                    # Reminds me of "I raised that boy" meme
                     raise RuntimeError("manual")
 
                 gen_start = time.time()
                 response = pipe.generate(prompt, config, streamer)
                 gen_stop = time.time()
-                # I know this isn't a super accurate measure, but openvino.PerfMetrics refused to work
+                # Good enough for our purposes
                 print("\n" + str(round((len(response)/(gen_stop - gen_start))/4,1)) + "t/s")
                 print('\n----------')
             pipe.finish_chat()
