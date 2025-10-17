@@ -12,6 +12,29 @@ from huggingface_hub.utils import HfHubHTTPError, HFValidationError
 
 # Helper functions
 
+def print_npu_info():
+    core = openvino.Core()
+    if "NPU" not in core.available_devices:
+        print(Fore.RED + "No NPU detected." + Fore.RESET)
+        return
+
+    print(Fore.CYAN + "\nNPU Summary" + Fore.RESET)
+
+    interesting = [
+        ["Name", "FULL_DEVICE_NAME"],
+        ["TOPS", "DEVICE_GOPS"],
+        ["NPU Memory", "NPU_DEVICE_TOTAL_MEM_SIZE"],
+        ["Driver Version", "NPU_DRIVER_VERSION"],
+        ["Efficient Features", "OPTIMIZATION_CAPABILITIES"],
+        ["Precision Level", "INFERENCE_PRECISION_HINT"],
+    ]
+
+    for name, prop in interesting:
+        try:
+            print(f"{name}: {core.get_property('NPU', prop)}")
+        except Exception:
+            pass
+
 def check_for_NPU():
     if "NPU" not in openvino.Core().available_devices:
         print(Fore.RED + "NPU was not detected. Have you installed the latest NPU driver?", flush=True)
@@ -217,6 +240,9 @@ def generate(pipe, config):
                     exit()
                 if prompt == "reset":
                     raise RuntimeError("manual")
+                if prompt == "npuinfo":
+                    print_npu_info()
+                    continue
 
                 gen_start = time.time()
                 response = pipe.generate(prompt, config, streamer)
@@ -247,7 +273,7 @@ def main():
     config.no_repeat_ngram_size = 3
     config.temperature = 0.75
 
-    print(Fore.GREEN + "Chat commands: \nexit - unload the model and exit the script \nreset - resets the chat context manually\n" + Fore.RESET, flush=True)
+    print(Fore.GREEN + "Chat commands: \nexit - unload the model and exit the script \nreset - resets the chat context manually \nnpuinfo - shows onboard NPU stats\n" + Fore.RESET, flush=True)
     generate(pipe, config)
 
 if '__main__' == __name__:
