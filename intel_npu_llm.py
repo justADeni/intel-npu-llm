@@ -158,6 +158,8 @@ model_selection = [
 "mistralai/Mistral-7B-Instruct-v0.2",
 "openbmb/MiniCPM-1B-sft-bf16",
 "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+# prequantized model in INT4
+"OpenVINO/Phi-3.5-mini-instruct-int4-ov",
 # For some reason, gptq models just won't run, and auto-gptq won't install
 #"TheBloke/Llama-2-7B-Chat-GPTQ",
 #"Qwen/Qwen2-7B-Instruct-GPTQ-Int4" 
@@ -175,25 +177,33 @@ def download_and_or_select_model():
     c += [s for s in l if not any(s in u for u in c)]
     c = [ Fore.CYAN + s + Fore.RESET if s not in available_to_download else Fore.RESET + s for s in c]
 
-    selected = select_from_list(c, Fore.GREEN + "Select a number or paste custom model name: " + Fore.RESET, allow_custom=True)
-        
-    if selected not in l:
-        if check_gated(selected):
-            register_token()
+    selected = select_from_list(c, Fore.GREEN + "Select a number or paste: " + Fore.RESET, allow_custom=True)
+    
+    selected_path = os.path.join(models_dir, selected)
+    
+    # return if OpenVINO file already exists
+    if os.path.exists(os.path.join(selected_path, "openvino_model.xml")):
+        print(Fore.CYAN + "Model already exists in OpenVINO format. Loading..." + Fore.RESET)
+        return selected
 
-        loaded = False
-        while not loaded:
-            try:
-                print(Fore.GREEN + "Downloading and quantizing selected model to INT4." + Fore.RESET, flush=True)
-                print(os.system("optimum-cli export openvino -m " + selected + " --weight-format int4 --sym --ratio 1.0 --group-size -1 --trust-remote-code models/" + selected))
-                loaded = True
-            except ValueError as e:
-                print(Fore.RED + f"Error while quantizing {selected}:" + Fore.RESET + f"{e}", flush=True)
+    if check_gated(selected):
+        register_token()
+
+    # if pre-optimized openvino model don't export
+    if "openvino" in selected.lower():
+        print(Fore.GREEN + "Downloading pre-optimized model..." + Fore.RESET)
+        os.system(f"huggingface-cli download {selected} --local-dir {selected_path}")
+    else:
+        # standard export for raw models
+        print(Fore.YELLOW + "Exporting/Quantizing raw model (RAM intensive)..." + Fore.RESET)
+        os.system(f"optimum-cli export openvino -m {selected} --weight-format int4 --trust-remote-code {selected_path}")
 
     return selected
 
 def load(model_name, model_path, prompt_length):
-    blob_path = os.path.join(script_dir, "npu_cache", model_name.split("/")[0], model_name.split("/")[1], "compiled_model.blob")
+    safe_name = model_name.replace("/", "_").replace("-", "_")
+    blob_name = f"{safe_name}_ctx{prompt_length}.blob"
+    blob_path = os.path.join(script_dir, "npu_cache", blob_name)
     is_cached = os.path.isfile(blob_path)
     pipeline_config = {}
 
@@ -202,19 +212,19 @@ def load(model_name, model_path, prompt_length):
         loaded_text = "Model loaded in "
         pipeline_config = {
             "BLOB_PATH": blob_path,
-            "GENERATE_HINT": "BEST_PERF",
+            "GENERATE_HINT": "LATENCY",
             "WEIGHTS_PATH": os.path.join(script_dir, "models", model_name, "openvino_model.bin"),
             "MAX_PROMPT_LEN": prompt_length
         }
     else:
-        os.makedirs(os.path.dirname(blob_path))
+        os.makedirs(os.path.dirname(blob_path), exist_ok = True)
         print(Fore.MAGENTA + "Since you're running it for the first time, the model will be compiled and cached, which may take a while (up to tens of minutes), especially for larger models. Subsequent starts will be much faster (tens of seconds), though still resource intensive.", flush=True)
         loading_text = "Compiling and caching the model for NPU."
         loaded_text = "Model compiled in "
         pipeline_config = { 
             "EXPORT_BLOB": "YES",
             "BLOB_PATH": blob_path,
-            "GENERATE_HINT": "BEST_PERF",
+            "GENERATE_HINT": "LATENCY",
             "MAX_PROMPT_LEN": prompt_length
         }
 
