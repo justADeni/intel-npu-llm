@@ -212,7 +212,7 @@ def load(model_name, model_path, prompt_length):
         loaded_text = "Model loaded in "
         pipeline_config = {
             "BLOB_PATH": blob_path,
-            "GENERATE_HINT": "LATENCY",
+            "GENERATE_HINT": "FAST_COMPILE",
             "WEIGHTS_PATH": os.path.join(script_dir, "models", model_name, "openvino_model.bin"),
             "MAX_PROMPT_LEN": prompt_length
         }
@@ -224,7 +224,7 @@ def load(model_name, model_path, prompt_length):
         pipeline_config = { 
             "EXPORT_BLOB": "YES",
             "BLOB_PATH": blob_path,
-            "GENERATE_HINT": "LATENCY",
+            "GENERATE_HINT": "FAST_COMPILE",
             "MAX_PROMPT_LEN": prompt_length
         }
 
