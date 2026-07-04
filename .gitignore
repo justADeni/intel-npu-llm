@@ -1,5 +1,22 @@
+# virtual envs
+/.venv/
+/npu_venv/
+/venv/
+
+# legacy local cache locations (models now live under the user cache dir)
 /models/
 /npu_cache/
 /download_cache/
-/npu_venv/
-/.idea
+
+# python build / packaging
+__pycache__/
+*.egg-info/
+/build/
+/dist/
+
+# editors
+/.idea/
+/.vscode/
+
+# miscellaneous
+/.claude/
